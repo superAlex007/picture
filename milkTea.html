@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>新年第一杯奶茶</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background-color: #f8f8f8;
+            font-family: "Microsoft YaHei", sans-serif;
+        }
+        .container {
+            width: 375px;
+            height: 812px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+            position: relative;
+        }
+        .interaction-screen {
+            height: 100%;
+            width: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            background-color: #ffd1dc;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            box-sizing: border-box;
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .cartoon {
+            width: 180px;
+            height: 180px;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            object-fit: contain;
+        }
+        /* 第五张图的展示样式（居中放大） */
+        .final-img {
+            width: 250px;
+            height: 250px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none; /* 默认隐藏 */
+            object-fit: contain;
+        }
+        .final-img.active {
+            display: block;
+        }
+        .question {
+            font-size: 20px;
+            margin-bottom: 30px;
+            text-align: center;
+            color: #e63946;
+            font-weight: bold;
+        }
+        .button-group {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            position: relative;
+            align-items: center;
+        }
+        .btn {
+            padding: 15px 30px;
+            border-radius: 30px;
+            border: none;
+            font-size: 18px;
+            cursor: pointer;
+            color: #fff;
+            transition: transform 0.3s ease;
+            font-weight: bold;
+            /* 新增：固定按钮的初始定位基准 */
+            position: relative;
+        }
+        .yes {
+            background-color: #ff4d4f;
+            box-shadow: 0 4px 8px rgba(255, 77, 79, 0.3);
+        }
+        .no {
+            background-color: #66b1ff;
+            box-shadow: 0 4px 8px rgba(102, 177, 255, 0.3);
+        }
+        .result {
+            display: none; /* 移除原有结果文字，改用第五张图 */
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="interaction-screen" id="interactionScreen">
+            <!-- 初始显示第一张图（前四张循环） -->
+            <img src="https://raw.githubusercontent.com/superAlex007/picture/master/59573cca051c50cc98fdf8ffde665c85.jpg" alt="卡通形象1" class="cartoon" id="cartoonImg">
+            <!-- 第五张图（点击可以后展示） -->
+            <img src="https://raw.githubusercontent.com/superAlex007/picture/master/ac6ad978f1e4a64ca72f14c23f364589.jpg" alt="最终图片" class="final-img" id="finalImg">
+            <div class="question" id="question">可以请我喝新年的第一杯奶茶吗？</div>
+            <div class="button-group" id="buttonGroup">
+                <button class="btn yes" id="yesBtn">可以</button>
+                <button class="btn no" id="noBtn">？你认真的吗..</button>
+            </div>
+            <div class="result" id="result">可以</div>
+        </div>
+    </div>
+
+    <script>
+        // 获取DOM元素
+        const yesBtn = document.getElementById('yesBtn');
+        const noBtn = document.getElementById('noBtn');
+        const cartoonImg = document.getElementById('cartoonImg');
+        const finalImg = document.getElementById('finalImg');
+        const question = document.getElementById('question');
+        const buttonGroup = document.getElementById('buttonGroup');
+
+        // 状态变量初始化
+        let noClickCount = 0; // 点击“不”按钮的总次数
+        let secondImgClickCount = 0; // 第二张图的额外点击计数
+        let currentImgIndex = 0; // 当前显示的前四张图索引
+        let currentScale = 1; // “可以”按钮缩放比例
+        const moveStep = 15; // “不”按钮每次移动的像素值
+        let currentX = 0, currentY = 0; // “不”按钮的偏移量
+        let yesBtnRect = null; // “可以”按钮的初始尺寸
+
+        // 前四张循环图片的链接
+        const imgSources = [
+            // 第1张（初始）- 比心图
+            'https://raw.githubusercontent.com/superAlex007/picture/master/59573cca051c50cc98fdf8ffde665c85.jpg',
+            // 第2张（点击1次）- 转圈图
+            'https://raw.githubusercontent.com/superAlex007/picture/master/794b90cfdff089c48c5cd51fa6adab44.jpg',
+            // 第3张（第二张图点击2次后）- 委屈哭哭图
+            'https://raw.githubusercontent.com/superAlex007/picture/master/f8216bdeaab7b5875cd396164bd79c96.jpg',
+            // 第4张（点击1次）- 气鼓鼓图
+            'https://raw.githubusercontent.com/superAlex007/picture/master/be06e5315e5c16663b97c013e0ba28d7.jpg'
+        ];
+
+        // 页面加载完成后获取“可以”按钮的初始尺寸（确保DOM渲染完成）
+        window.addEventListener('DOMContentLoaded', () => {
+            yesBtnRect = yesBtn.getBoundingClientRect();
+        });
+
+        // 点击「可以」按钮的逻辑
+        yesBtn.addEventListener('click', () => {
+            // 隐藏提问文字、按钮组、循环展示的图片
+            question.style.display = 'none';
+            buttonGroup.style.display = 'none';
+            cartoonImg.style.display = 'none';
+            // 显示最终的第五张图片
+            finalImg.classList.add('active');
+        });
+
+        // 点击「？你认真的吗..」按钮的核心逻辑
+        noBtn.addEventListener('click', () => {
+            // 防止未获取到按钮尺寸时出错
+            if (!yesBtnRect) {
+                yesBtnRect = yesBtn.getBoundingClientRect();
+            }
+
+            // 1. 累计点击次数
+            noClickCount++;
+
+            // 2. 放大“可以”按钮（每次放大1.5倍）
+            currentScale *= 1.5;
+            yesBtn.style.transform = `scale(${currentScale})`;
+
+            // 3. 移动“不”按钮到右下角，避免被放大的“可以”按钮遮挡
+            currentX += moveStep;
+            currentY += moveStep;
+            // 计算“可以”按钮放大后的尺寸，确保“不”按钮不重叠
+            const yesBtnScaledWidth = yesBtnRect.width * currentScale;
+            const yesBtnScaledHeight = yesBtnRect.height * currentScale;
+            currentX = Math.max(currentX, yesBtnScaledWidth / 2);
+            currentY = Math.max(currentY, yesBtnScaledHeight / 2);
+            noBtn.style.transform = `translate(${currentX}px, ${currentY}px)`;
+
+            // 4. 图片切换逻辑
+            if (currentImgIndex === 3) {
+                // 当前是第四张图，不再切换
+                return;
+            } else if (currentImgIndex === 1) {
+                // 当前是第二张图，需要点击2次才切换到第三张
+                secondImgClickCount++;
+                if (secondImgClickCount === 2) {
+                    currentImgIndex = 2; // 切换到第三张图
+                    secondImgClickCount = 0; // 重置第二张图的计数
+                    cartoonImg.src = imgSources[currentImgIndex];
+                }
+            } else {
+                // 非第二/第四张图，点击1次切换1张
+                currentImgIndex = (currentImgIndex + 1) % imgSources.length;
+                cartoonImg.src = imgSources[currentImgIndex];
+            }
+
+            // 5. 重置逻辑：总点击次数超过6次，恢复所有初始状态
+            if (noClickCount > 6) {
+                currentImgIndex = 0;
+                noClickCount = 0;
+                secondImgClickCount = 0;
+                currentScale = 1;
+                currentX = 0;
+                currentY = 0;
+                // 恢复按钮样式
+                yesBtn.style.transform = `scale(${currentScale})`;
+                noBtn.style.transform = `translate(${currentX}px, ${currentY}px)`;
+                // 恢复初始图片
+                cartoonImg.src = imgSources[currentImgIndex];
+            }
+        });
+    </script>
+</body>
+</html>
